@@ -12,7 +12,7 @@ Compiling:
 Scalar
 ======
 
-icc -o program program.c -fopenmp 
+icc -o program program.c -fopenmp -mkl
 
 Blocked OpenMP
 ==============
