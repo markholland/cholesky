@@ -7,7 +7,7 @@ void chol_escalar(double *A, int n){
 
   int k, i, j;
   double c;
-  
+ 
   for(k=0; k<n; k++) {
     c=sqrt(A[k+k*n]);
     A[k+k*n]=c;
@@ -27,7 +27,7 @@ void chol_escalar(double *A, int n){
 
 int main( int argc, char *argv[] ) {
 
-  int n, i, j, info, b;
+  int n, i, j, info;
   double *A;
   double t1, t2;
 
