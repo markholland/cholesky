@@ -1,4 +1,4 @@
-A collection of parallel implementations of the Cholesky Descomposition.
+A collection of parallel implementations of the Cholesky Decomposition.
 =======================================================================
 Scalar aglorithm with OpenMP parallel for.
 
