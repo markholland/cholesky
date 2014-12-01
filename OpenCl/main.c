@@ -6,7 +6,6 @@
 #include "spd_matrix.h"
 #include "cholesky.h"
 #include <CL/cl.h>
-#include "omp.h"
 
 void CL_CALLBACK onOpenCLError(const char *errinfo,  const void *private_info,
                                size_t cb, void *user_data)
@@ -23,7 +22,6 @@ typedef struct DeviceDesc{
 
 int main(int argc, char *argv[])
 {
-int method = 0;
     srand( time( NULL ) );
 	if (!argv[1])
 	{
@@ -31,29 +29,20 @@ int method = 0;
 	    exit(-1);
 	}
 	int dimension = atoi(argv[1]);
-	if (atoi(argv[2]) == 1)
-        method = 1;
-    else if (atoi(argv[2]) == 2)
-        method = 2;
-    else
-    {
-        printf("Specify decomposition method.\n");
-        exit(-1);
-    }
-
+	
     cl_int result;
 
     cl_uint             numEntries = 1;
     cl_platform_id*     platforms;
     cl_uint             numPlatforms;
-    
+   
     cl_uint             maxDevices = 1;
     cl_device_id*       deviceIDs;
     cl_uint             numDevices;
     
     cl_context_properties*  properties = 0;
     cl_uint                 usedDevices = 1;
-
+    
     cl_command_queue_properties commandQueueProperties = CL_QUEUE_PROFILING_ENABLE;
 
     
@@ -97,7 +86,7 @@ int method = 0;
             break;
     }
 
-   
+    
     size_t deviceNameLength = 4096;
     char* tempDeviceName = (char*)malloc(4096);
     result |= clGetDeviceInfo(deviceIDs[0], CL_DEVICE_NAME, deviceNameLength, tempDeviceName, &actualSize);
@@ -113,10 +102,10 @@ int method = 0;
     }
 
     printf("%s: %s\n", device_desc.deviceTypeString,device_desc.deviceName);
-    printf("CL_KERNEL_WORK_GROUP_SIZE: %d\n", CL_KERNEL_WORK_GROUP_SIZE);
+    printf("CL_KERNEL_WORK_GROUP_SIZE: %d\nThis is the largest Matrix I can work with.\n", CL_KERNEL_WORK_GROUP_SIZE);
     if (dimension > CL_KERNEL_WORK_GROUP_SIZE)
     {
-        printf("Matrix to large.\n");
+        printf("Matrix too large.\n");
         exit(-1);
     }
 
@@ -134,7 +123,7 @@ int method = 0;
     cl_program program = clCreateProgramWithSource(context, 1, (const char **)&kernels, NULL, &result);
     if(result != CL_SUCCESS) exit(5);
 
-    
+   
     result = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
     if(result != CL_SUCCESS)
     {
@@ -151,29 +140,33 @@ int method = 0;
     
     if(result != CL_SUCCESS) exit(7);
 
-    printf("Dimension: %d\n", dimension);
+    
+    printf("You chose Dimension: %d\n", dimension);
     float norm1, norm2, norm3;
     float** A = dmatrix(1, dimension, 1, dimension);
     float** A_clone = dmatrix(1, dimension, 1, dimension);
     float** L = dmatrix(1, dimension, 1, dimension);
     float** L_t = dmatrix(1, dimension, 1, dimension);
 
-    A = generate_random_matrix(A, dimension);
+    
+	A = generate_random_matrix(A, dimension);
     A = construct_symetric_matrix(A, dimension);
 	A = matrix_positive_definite(A, dimension);
     norm1 = frobenius_norm(A, dimension);
 
+   
     A_clone = clone_matrix(A, dimension);
-    printf("Method:\tcholdc\n");
-	double t1=omp_get_wtime();
-        L = choldc(A_clone, L, dimension);
-	double t2=omp_get_wtime();
-	printf("OMP Time: %f\n", t2-t1);
-    
+    L = choldc(A_clone, L, dimension);
+   
     L_t = clone_matrix(L, dimension);
     L_t = transpose_matrix(L_t, dimension);
 
-    
+    /*
+    A_clone = multiply(L, L_t, A_clone, dimension);
+    norm2 = frobenius_norm(A_clone, dimension);
+    printf("Error \tCPU: % 20.16lf\n", fabs(norm1 - norm2));
+    */
+     
     size_t numberOfValues = dimension * dimension;
     size_t sizeOfBuffers = numberOfValues * sizeof(float);
     float* inputDoubles = (float*)malloc(sizeOfBuffers);
@@ -183,7 +176,7 @@ int method = 0;
     cl_mem inputBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeOfBuffers, NULL, &result);
     if(result != CL_SUCCESS) exit(8);
 
-	
+ 
     cl_bool     blockingWrite = CL_TRUE;
     size_t      offset = 0;
     cl_event    dataInputCopyEvent;
@@ -193,21 +186,17 @@ int method = 0;
     result = clEnqueueWriteBuffer(commands, inputBuffer, blockingWrite, offset, sizeOfBuffers, inputDoubles, numEvents, eventsToWait, &dataInputCopyEvent);
     if(result != CL_SUCCESS) exit(9);
 
+   
     cl_mem outputBuffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeOfBuffers, NULL, &result);
     if(result != CL_SUCCESS) exit(10);
 
-
-   
+    
     result = 0;
     result |= clSetKernelArg(choldc_gpu, 0, sizeof(cl_mem), &inputBuffer);
     result |= clSetKernelArg(choldc_gpu, 1, sizeof(cl_mem), &outputBuffer);
     result |= clSetKernelArg(choldc_gpu, 2, sizeof(int), &dimension);
-   
-if(result != CL_SUCCESS) exit(11);
+    if(result != CL_SUCCESS) exit(11);
     result = 0;
-
-
-
 
     cl_uint   workDim = 1;
     size_t*   globalWorkOffset = NULL;
@@ -231,13 +220,29 @@ if(result != CL_SUCCESS) exit(11);
     clGetEventProfilingInfo(kernelExecEvent, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
     cl_double g_NDRangePureExecTimeMs = (cl_double)(end - start)*(cl_double)(1e-09);
     printf("Time \tGPU: % 20.16lf\n", g_NDRangePureExecTimeMs);
-
+    if(result != CL_SUCCESS)
+    {
+        printf("%d\n", (unsigned int) result);
+        exit(13);
+    }
 
    
+    cl_bool     blockingRead = CL_TRUE;
+                offset = 0;
+    float*     resultArray;
+    cl_event    readResultsEvent;
+                eventsToWait = NULL;
+                numEvents = 0;
+
+    resultArray = (float*)malloc(numberOfValues * sizeof(float));
+
+    
+    clEnqueueReadBuffer(commands, outputBuffer, blockingRead, offset, sizeOfBuffers, resultArray, numEvents, eventsToWait, &readResultsEvent);
+  
     free(platforms);
     free(deviceIDs);
     free(inputDoubles);
- 
+    free(resultArray);
 
 return 0;
 }

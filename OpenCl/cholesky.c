@@ -4,29 +4,36 @@
 #include <math.h>
 #include <time.h>
 
+
 float** choldc(float **A, float **L, int dimension)
 {
     int i,j,k;
+    float c;
     float sum;
     clock_t begin, end;
 
     begin = clock();
     for (k = 1; k <= dimension; k++)
     {
-        sum = A[k][k];
-        for (j = 1; j <= k - 1; j++) sum = sum - (L[k][j] * L[k][j]);
-        L[k][k] = sqrt(sum);
-        for (i = k + 1; i <= dimension; i++)
-        {
-            sum = A[i][k];
-            for (j = 1; j <= k - 1; j++) sum = sum - L[i][j] * L[k][j];
-            L[i][k] = sum / L[k][k];
-        }
+        for(k=1; k<=dimension; k++) {
+            c=sqrt(A[k][k]);
+            A[k][k]=c;
+
+            for(i=k+1; i<=dimension; i++) {
+                A[i][k]=A[i][k]/c;
+            }
+
+        for (i=k+1; i<=dimension; i++) {
+            for (j=k+1; j<=i-1; j++) {
+                A[i][j]=A[i][j]-A[i][k]*A[j][k];
+            }
+            A[i][i]=A[i][i]-A[i][k]*A[i][k];
+            }
+        }   
     }
+
     end = clock();
     printf("Time \tCPU: % 20.16lf\n", (float)(end - begin) / CLOCKS_PER_SEC);
 
-return L;
+return A;
 }
-
-

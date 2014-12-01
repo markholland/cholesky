@@ -9,7 +9,7 @@ else
 endif
 
 main: main.c
-	gcc -fopenmp -Wall -g main.c cholesky.c spd_matrix.c -o main $(OPTIONS)
+	gcc -fopenmp -Wall -g main.c cholesky.c spd_matrix.c -o main -L /opt/AMDAPPSDK-2.9-1/lib/x86_64/ $(OPTIONS)
 
 clean:
 	rm -rf main
