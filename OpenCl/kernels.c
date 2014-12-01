@@ -20,7 +20,9 @@ float sum;
             {
                 i = x + 1;
                 sum = A(i,k);
-                for (j = 0; j < k - 1; j++) sum = sum - L(i,j) * L(k,j);
+                for (j = 0; j < k - 1; j++) {
+                    sum = sum - L(i,j) * L(k,j);
+                }
                 L(i,k) = sum / L(k,k);
             }
         }
